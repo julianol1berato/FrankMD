@@ -418,6 +418,15 @@ The `.fed` file appears in the explorer panel with a gear icon. You can click it
 | `gemini_model` | string | gemini-2.0-flash | Gemini model |
 | `openai_api_key` | string | - | OpenAI API key |
 | `openai_model` | string | gpt-4o-mini | OpenAI model |
+| `backup_enabled` | boolean | `false` | Upload a daily snapshot of the notes (see [Notes Backup](#optional-notes-backup-s3-compatible)) |
+| `backup_time` | string | `01:00` | Time of day for the backup, container clock |
+| `backup_s3_bucket` | string | - | Private bucket for backups |
+| `backup_s3_prefix` | string | `frankmd-backups` | Key prefix for backups |
+| `backup_s3_region` | string | - | Backup bucket region |
+| `backup_s3_endpoint` | string | - | Custom endpoint for Backblaze B2, Wasabi or MinIO; leave unset for AWS |
+| `backup_s3_force_path_style` | boolean | `true` | Path-style URLs for the backup endpoint (bucket in the path) |
+| `backup_s3_access_key_id` | string | - | Access key for the backup bucket |
+| `backup_s3_secret_access_key` | string | - | Secret key for the backup bucket |
 
 ### Environment Variables
 
@@ -442,6 +451,60 @@ To upload images to S3 instead of using local paths:
 | `AWS_SECRET_ACCESS_KEY` | Your AWS secret key |
 | `AWS_S3_BUCKET` | S3 bucket name |
 | `AWS_REGION` | AWS region (e.g., `us-east-1`) |
+
+### Optional: Notes Backup (S3-compatible)
+
+FrankMD can upload a compressed snapshot of your notes directory once a day to S3-compatible storage: AWS S3, Backblaze B2, Wasabi or MinIO. Configure it in **Settings → Backup**, in `.fed`, or with environment variables, then use **Test connection** and **Back up now** to check it.
+
+- Each run uploads `<prefix>/daily/YYYY-MM-DD.tar.gz`. The first successful backup of each month is also written to `<prefix>/monthly/YYYY-MM.tar.gz`.
+- Backups run at `backup_time` (default `01:00`) on the container clock, so set `TZ` (e.g. `TZ=America/Sao_Paulo`). A backup missed while the container was stopped runs right after it starts again; a failed one is retried an hour later.
+- The archive keeps each file's modification time and leaves out `.fed` (it holds your API keys), `.git/`, lock files and FrankMD's `.frankmd/` state folder. Symlinks are not followed.
+- **Use a private bucket.** Never reuse the bucket that serves your images publicly.
+- **FrankMD never deletes backups.** Add a lifecycle rule to the bucket that expires `daily/` (for example after 30 days) and keeps `monthly/`. The backup credentials then only need `s3:PutObject`, so a leaked key cannot wipe your history.
+
+| Provider | `backup_s3_endpoint` | `backup_s3_region` |
+|----------|----------------------|--------------------|
+| AWS S3 | (leave empty) | e.g. `us-east-1` |
+| Backblaze B2 | `https://s3.<region>.backblazeb2.com` | e.g. `us-west-004` |
+| Wasabi | `https://s3.<region>.wasabisys.com` | e.g. `us-east-1` |
+| MinIO / SeaweedFS | `http://minio:9000` | `us-east-1` |
+
+Path-style URLs (`backup_s3_force_path_style`) are on by default: MinIO and SeaweedFS require them and B2, Wasabi and R2 accept them. **Test connection** gives up after 10 seconds, so a wrong endpoint fails fast.
+
+Wasabi bills every object for at least 90 days, so expiring `daily/` sooner saves nothing there.
+
+Minimal AWS IAM policy for the backup key:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Action": "s3:PutObject",
+    "Resource": "arn:aws:s3:::my-notes-backup/frankmd-backups/*"
+  }]
+}
+```
+
+To restore, download a snapshot and extract it into a new folder, then point `NOTES_PATH` at it or copy back the notes you need:
+
+```bash
+aws s3 cp s3://my-notes-backup/frankmd-backups/daily/2026-10-15.tar.gz .
+mkdir restored-notes && tar -xzf 2026-10-15.tar.gz -C restored-notes
+```
+
+| Variable | Description |
+|----------|-------------|
+| `FRANKMD_BACKUP_ENABLED` | `true` to run the daily backup |
+| `FRANKMD_BACKUP_TIME` | Time of day, `HH:MM` (default `01:00`) |
+| `BACKUP_S3_BUCKET` | Private bucket for the snapshots |
+| `BACKUP_S3_PREFIX` | Key prefix (default `frankmd-backups`) |
+| `BACKUP_S3_REGION` | Bucket region |
+| `BACKUP_S3_ENDPOINT` | Custom endpoint for B2, Wasabi or MinIO; leave unset for AWS |
+| `BACKUP_S3_FORCE_PATH_STYLE` | `false` to use virtual-host URLs (default `true`) |
+| `BACKUP_S3_ACCESS_KEY_ID` | Access key for the backup bucket |
+| `BACKUP_S3_SECRET_ACCESS_KEY` | Secret key for the backup bucket |
+| `TZ` | Container time zone used by `FRANKMD_BACKUP_TIME` |
 
 ### Optional: YouTube Search
 

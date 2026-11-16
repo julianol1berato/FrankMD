@@ -96,6 +96,8 @@ class ConfigTest < ActiveSupport::TestCase
     assert_includes content, "# ollama_api_base"
     assert_includes content, "# anthropic_api_key"
     assert_includes content, "# gemini_api_key"
+    assert_includes content, "# Notes Backup"
+    assert_includes content, "# backup_s3_bucket"
   end
 
   # === Default Values ===
@@ -492,6 +494,34 @@ class ConfigTest < ActiveSupport::TestCase
 
     config2 = Config.new(base_path: @test_dir)
     assert config2.feature_available?(:s3_upload)
+  end
+
+  test "feature_available? detects notes backup configuration separately from image uploads" do
+    @test_dir.join(".fed").write(<<~CONFIG)
+      aws_access_key_id = key
+      aws_secret_access_key = secret
+      aws_s3_bucket = public-images
+    CONFIG
+    refute Config.new(base_path: @test_dir).feature_available?(:notes_backup)
+
+    @test_dir.join(".fed").write(<<~CONFIG)
+      backup_s3_bucket = notes-backup
+      backup_s3_access_key_id = key
+      backup_s3_secret_access_key = secret
+    CONFIG
+    assert Config.new(base_path: @test_dir).feature_available?(:notes_backup)
+  end
+
+  test "backup credentials are masked in all_settings" do
+    @test_dir.join(".fed").write(<<~CONFIG)
+      backup_s3_access_key_id = key
+      backup_s3_secret_access_key = secret
+    CONFIG
+
+    settings = Config.new(base_path: @test_dir).all_settings
+    refute settings.key?("backup_s3_secret_access_key")
+    assert_equal true, settings["backup_s3_secret_access_key_configured"]
+    assert_equal true, settings["backup_s3_access_key_id_configured"]
   end
 
   test "feature_available? detects YouTube configuration" do

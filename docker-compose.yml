@@ -47,6 +47,19 @@ services:
       - AWS_S3_BUCKET=${AWS_S3_BUCKET:-}
       - AWS_REGION=${AWS_REGION:-}
 
+      # Optional: daily notes backup to S3-compatible storage
+      - FRANKMD_BACKUP_ENABLED=${FRANKMD_BACKUP_ENABLED:-}
+      - FRANKMD_BACKUP_TIME=${FRANKMD_BACKUP_TIME:-}
+      - BACKUP_S3_BUCKET=${BACKUP_S3_BUCKET:-}
+      - BACKUP_S3_PREFIX=${BACKUP_S3_PREFIX:-}
+      - BACKUP_S3_REGION=${BACKUP_S3_REGION:-}
+      - BACKUP_S3_ENDPOINT=${BACKUP_S3_ENDPOINT:-}
+      - BACKUP_S3_FORCE_PATH_STYLE=${BACKUP_S3_FORCE_PATH_STYLE:-}
+      - BACKUP_S3_ACCESS_KEY_ID=${BACKUP_S3_ACCESS_KEY_ID:-}
+      - BACKUP_S3_SECRET_ACCESS_KEY=${BACKUP_S3_SECRET_ACCESS_KEY:-}
+      # Time zone for FRANKMD_BACKUP_TIME (e.g. America/Sao_Paulo)
+      - TZ=${TZ:-}
+
       # Optional: YouTube search
       - YOUTUBE_API_KEY=${YOUTUBE_API_KEY:-}
 
