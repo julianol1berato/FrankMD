@@ -199,6 +199,12 @@ class NotesService
     results.sort_by { |r| -r[:mtime].to_i }
   end
 
+  # Hold the shared tree lock so FrankMD writers wait until the block (e.g. a
+  # backup snapshot) has finished reading the notes directory.
+  def with_shared_lock(&block)
+    with_filesystem_lock(File::LOCK_SH, &block)
+  end
+
   private
 
   # Write atomically: write to a temp file in the same directory, then rename it

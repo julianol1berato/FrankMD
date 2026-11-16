@@ -2,8 +2,17 @@
   class="w-[calc(100%-2rem)] max-w-4xl h-[680px] max-h-[85vh] overflow-y-auto p-0 rounded-lg shadow-xl backdrop:bg-black/50 bg-[var(--theme-bg-secondary)] border border-[var(--theme-border)] text-[var(--theme-text-primary)]"
   id="settings-dialog"
   data-app-target="settingsDialog"
-  data-controller="settings" data-settings-media-storage-outlet='[data-controller~="media-storage"]'
+  data-controller="settings backup-settings" data-settings-media-storage-outlet='[data-controller~="media-storage"]'
   data-action="click->settings#closeOnBackdrop"
+  data-backup-settings-messages-value="<%= {
+    saving: t('settings.backup_settings.saving'),
+    testing: t('settings.backup_settings.testing'),
+    running: t('settings.backup_settings.running'),
+    request_failed: t('settings.backup_settings.request_failed'),
+    never: t('settings.backup_settings.never'),
+    secret_configured: t('settings.backup_settings.secret_configured'),
+    secret_missing: t('settings.backup_settings.secret_missing')
+  }.to_json %>"
   data-settings-codemirror-outlet='[data-controller~="codemirror"]'
   data-settings-preview-outlet='[data-controller~="preview"]'
   data-settings-font-value="<%= @config_obj.get('editor_font') || 'cascadia-code' %>"
@@ -103,6 +112,21 @@
             <path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
           </svg>
           <%= t('settings.preview') %>
+        </button>
+        <button
+          type="button"
+          class="settings-nav-button"
+          data-settings-target="navButton"
+          data-category="backup"
+          data-action="click->settings#showCategory click->backup-settings#load"
+          aria-pressed="false"
+        >
+          <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M7 18a4.6 4.4 0 0 1 0-9 5 4.5 0 0 1 11 2h1a3.5 3.5 0 0 1 0 7h-1" />
+            <path d="M9 15l3-3 3 3" />
+            <path d="M12 12v9" />
+          </svg>
+          <%= t('settings.backup') %>
         </button>
         <button
           type="button"
@@ -431,6 +455,111 @@
               <% end %>
             </select>
           </div>
+        </div>
+
+        <!-- Backup -->
+        <% backup_input_class = "px-3 py-2 text-sm border border-[var(--theme-border)] rounded-md bg-[var(--theme-bg-primary)] text-[var(--theme-text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--theme-accent)]" %>
+        <div class="settings-section hidden" data-settings-target="section" data-category="backup">
+          <h2 class="settings-section-title"><%= t('settings.backup') %></h2>
+          <p class="text-sm text-[var(--theme-text-secondary)]"><%= t('settings.backup_settings.description') %></p>
+          <p class="mt-1 mb-3 text-xs text-[var(--theme-warning)]"><%= t('settings.backup_settings.private_bucket_warning') %></p>
+
+          <div class="settings-card">
+            <div class="min-w-0">
+              <p class="text-sm font-medium"><%= t('settings.backup_settings.enabled') %></p>
+              <p class="mt-0.5 text-xs text-[var(--theme-text-muted)]"><%= t('settings.backup_settings.enabled_description') %></p>
+            </div>
+            <button
+              type="button"
+              data-backup-settings-target="toggle"
+              data-key="backup_enabled"
+              data-action="click->backup-settings#toggle"
+              aria-pressed="false"
+              class="settings-switch shrink-0"
+              title="<%= t('settings.backup_settings.enabled') %>"
+            >
+              <span class="settings-switch-knob" aria-hidden="true"></span>
+            </button>
+          </div>
+
+          <div class="settings-card">
+            <div class="min-w-0">
+              <label for="backup-time" class="text-sm font-medium"><%= t('settings.backup_settings.time') %></label>
+              <p class="mt-0.5 text-xs text-[var(--theme-text-muted)]"><%= t('settings.backup_settings.time_description') %></p>
+            </div>
+            <input id="backup-time" type="time" name="backup_time" data-backup-settings-target="field" class="w-32 shrink-0 <%= backup_input_class %>">
+          </div>
+
+          <div class="settings-card flex-col">
+            <div class="flex w-full flex-col gap-3">
+              <div class="grid gap-3 sm:grid-cols-2">
+                <% [
+                  ["backup_s3_bucket", "bucket", "my-notes-backup"],
+                  ["backup_s3_prefix", "prefix", "frankmd-backups"],
+                  ["backup_s3_region", "region", "us-east-1"],
+                  ["backup_s3_endpoint", "endpoint", "https://s3.us-west-004.backblazeb2.com"]
+                ].each do |key, label, placeholder| %>
+                  <div>
+                    <label for="<%= key.dasherize %>" class="mb-1 block text-xs font-medium text-[var(--theme-text-secondary)]"><%= t("settings.backup_settings.#{label}") %></label>
+                    <input id="<%= key.dasherize %>" type="text" name="<%= key %>" placeholder="<%= placeholder %>" autocomplete="off" spellcheck="false" data-backup-settings-target="field" class="w-full <%= backup_input_class %>">
+                  </div>
+                <% end %>
+              </div>
+              <p class="text-xs text-[var(--theme-text-muted)]"><%= t('settings.backup_settings.endpoint_hint') %></p>
+              <div class="flex items-center justify-between gap-4">
+                <div class="min-w-0">
+                  <p class="text-sm font-medium"><%= t('settings.backup_settings.force_path_style') %></p>
+                  <p class="mt-0.5 text-xs text-[var(--theme-text-muted)]"><%= t('settings.backup_settings.force_path_style_description') %></p>
+                </div>
+                <button
+                  type="button"
+                  data-backup-settings-target="toggle"
+                  data-key="backup_s3_force_path_style"
+                  data-action="click->backup-settings#toggle"
+                  aria-pressed="false"
+                  class="settings-switch shrink-0"
+                  title="<%= t('settings.backup_settings.force_path_style') %>"
+                >
+                  <span class="settings-switch-knob" aria-hidden="true"></span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-card flex-col">
+            <div class="flex w-full flex-col gap-3">
+              <p class="text-sm font-medium"><%= t('settings.backup_settings.credentials') %></p>
+              <div class="grid gap-3 sm:grid-cols-2">
+                <% [
+                  ["backup_s3_access_key_id", "access_key_id"],
+                  ["backup_s3_secret_access_key", "secret_access_key"]
+                ].each do |key, label| %>
+                  <div>
+                    <label for="<%= key.dasherize %>" class="mb-1 block text-xs font-medium text-[var(--theme-text-secondary)]"><%= t("settings.backup_settings.#{label}") %></label>
+                    <input id="<%= key.dasherize %>" type="password" name="<%= key %>" autocomplete="new-password" spellcheck="false" data-backup-settings-target="secret" class="w-full <%= backup_input_class %>">
+                  </div>
+                <% end %>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-3 flex flex-wrap gap-2">
+            <button type="button" data-backup-settings-target="button" data-action="click->backup-settings#save" class="px-3 py-1.5 text-sm rounded-md bg-[var(--theme-accent)] text-[var(--theme-accent-text)] hover:bg-[var(--theme-accent-hover)] disabled:opacity-50 disabled:cursor-not-allowed"><%= t('settings.backup_settings.save') %></button>
+            <button type="button" data-backup-settings-target="button" data-action="click->backup-settings#testConnection" class="px-3 py-1.5 text-sm rounded-md border border-[var(--theme-border)] text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-hover)] disabled:opacity-50 disabled:cursor-not-allowed"><%= t('settings.backup_settings.test_connection') %></button>
+            <button type="button" data-backup-settings-target="button" data-action="click->backup-settings#runNow" class="px-3 py-1.5 text-sm rounded-md border border-[var(--theme-border)] text-[var(--theme-text-primary)] hover:bg-[var(--theme-bg-hover)] disabled:opacity-50 disabled:cursor-not-allowed"><%= t('settings.backup_settings.run_now') %></button>
+          </div>
+          <p class="hidden mt-2 text-sm" data-backup-settings-target="message" role="status" aria-live="polite"></p>
+
+          <div class="settings-card mt-3">
+            <div class="w-full space-y-1">
+              <p class="text-sm">
+                <span class="font-medium"><%= t('settings.backup_settings.last_backup') %>:</span>
+                <span data-backup-settings-target="lastBackup"><%= t('settings.backup_settings.never') %></span>
+              </p>
+              <p class="hidden text-sm text-[var(--theme-error)]" data-backup-settings-target="lastError"></p>
+            </div>
+          </div>
+          <p class="mt-2 text-xs text-[var(--theme-text-muted)]"><%= t('settings.backup_settings.retention_hint') %></p>
         </div>
 
         <section class="settings-section hidden" data-settings-target="section" data-category="about" aria-labelledby="settings-about-title">

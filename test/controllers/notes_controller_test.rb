@@ -785,10 +785,19 @@ class NotesControllerTest < ActionDispatch::IntegrationTest
   test "index renders settings dialog with editor config values" do
     get root_url
     assert_response :success
-    assert_select "dialog[data-app-target='settingsDialog'][data-controller='settings'][aria-modal='true']"
-    assert_select "dialog[data-controller='settings'][data-settings-font-value]"
-    assert_select "dialog[data-controller='settings'][data-settings-font-size-value]"
-    assert_select "dialog[data-controller='settings'][data-settings-editor-width-value]"
+    assert_select "dialog[data-app-target='settingsDialog'][data-controller~='settings'][aria-modal='true']"
+    assert_select "dialog[data-controller~='settings'][data-settings-font-value]"
+    assert_select "dialog[data-controller~='settings'][data-settings-font-size-value]"
+    assert_select "dialog[data-controller~='settings'][data-settings-editor-width-value]"
+  end
+
+  test "index renders the backup section of the settings dialog" do
+    get root_url
+    assert_response :success
+    assert_select "dialog[data-controller~='backup-settings'][data-backup-settings-messages-value]"
+    assert_select "button[data-category='backup'][data-action~='click->backup-settings#load']"
+    assert_select "[data-settings-target='section'][data-category='backup'] input[name='backup_s3_bucket']"
+    assert_select "[data-settings-target='section'][data-category='backup'] input[type='password'][name='backup_s3_secret_access_key']"
   end
 
   # === turbo stream responses ===

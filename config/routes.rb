@@ -65,6 +65,12 @@ Rails.application.routes.draw do
   get "config", to: "config#show"
   patch "config", to: "config#update"
 
+  # Notes backup API
+  get "backup", to: "backup#show"
+  patch "backup", to: "backup#update"
+  post "backup/run", to: "backup#run_now"
+  post "backup/test", to: "backup#test_connection"
+
   # Translations API (for JavaScript i18n)
   get "translations", to: "translations#show"
 

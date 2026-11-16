@@ -5,7 +5,7 @@
 class Config
   CONFIG_FILE = ".fed"
   LOCK_FILE = ".frankmd-config.lock"
-  CONFIG_VERSION = 6  # Increment when adding new settings
+  CONFIG_VERSION = 7  # Increment when adding new settings
 
   # All configurable options with their defaults and types
   SCHEMA = {
@@ -78,7 +78,22 @@ class Config
     "auth_token" => { default: nil, type: :string, env: "FRANKMD_AUTH_TOKEN" },
 
     # AI Image Generation
-    "image_generation_model" => { default: "google/gemini-3.1-flash-image-preview", type: :string, env: "IMAGE_GENERATION_MODEL" }
+    "image_generation_model" => { default: "google/gemini-3.1-flash-image-preview", type: :string, env: "IMAGE_GENERATION_MODEL" },
+
+    # Notes backup: one compressed snapshot per day to S3-compatible storage
+    # (AWS S3, Backblaze B2, Wasabi, MinIO). Kept separate from the image
+    # upload bucket, which is usually public.
+    "backup_enabled" => { default: false, type: :boolean, env: "FRANKMD_BACKUP_ENABLED" },
+    "backup_time" => { default: "01:00", type: :string, env: "FRANKMD_BACKUP_TIME" },
+    "backup_s3_bucket" => { default: nil, type: :string, env: "BACKUP_S3_BUCKET" },
+    "backup_s3_prefix" => { default: "frankmd-backups", type: :string, env: "BACKUP_S3_PREFIX" },
+    "backup_s3_region" => { default: nil, type: :string, env: "BACKUP_S3_REGION" },
+    "backup_s3_endpoint" => { default: nil, type: :string, env: "BACKUP_S3_ENDPOINT" },
+    # Path-style by default: MinIO and SeaweedFS require it, while B2, Wasabi
+    # and R2 accept both styles. Only used together with backup_s3_endpoint.
+    "backup_s3_force_path_style" => { default: true, type: :boolean, env: "BACKUP_S3_FORCE_PATH_STYLE" },
+    "backup_s3_access_key_id" => { default: nil, type: :string, env: "BACKUP_S3_ACCESS_KEY_ID" },
+    "backup_s3_secret_access_key" => { default: nil, type: :string, env: "BACKUP_S3_SECRET_ACCESS_KEY" }
   }.freeze
 
   # Keys that should not be exposed to the frontend (sensitive)
@@ -93,6 +108,21 @@ class Config
     anthropic_api_key
     gemini_api_key
     cheaperinference_api_key
+    backup_s3_access_key_id
+    backup_s3_secret_access_key
+  ].freeze
+
+  # Keys editable from the Backup section of the settings dialog
+  BACKUP_KEYS = %w[
+    backup_enabled
+    backup_time
+    backup_s3_bucket
+    backup_s3_prefix
+    backup_s3_region
+    backup_s3_endpoint
+    backup_s3_force_path_style
+    backup_s3_access_key_id
+    backup_s3_secret_access_key
   ].freeze
 
   # Keys that are UI settings (saved from frontend)
@@ -285,6 +315,28 @@ class Config
         "# ollama_api_base = http://localhost:11434",
         "# ollama_model = llama3.2:latest"
       ]
+    },
+    {
+      marker: "# Notes Backup",
+      lines: [
+        "",
+        "# Notes Backup (daily snapshot to S3-compatible storage)",
+        "# Use a private bucket, never the public bucket that serves images.",
+        "# backup_time uses the container clock: set TZ (e.g. America/Sao_Paulo).",
+        "",
+        "# backup_enabled = false",
+        "# backup_time = 01:00",
+        "# backup_s3_bucket = your-backup-bucket",
+        "# backup_s3_prefix = frankmd-backups",
+        "# backup_s3_region = us-east-1",
+        "# backup_s3_access_key_id = your-access-key",
+        "# backup_s3_secret_access_key = your-secret-key",
+        "",
+        "# Backblaze B2: https://s3.<region>.backblazeb2.com",
+        "# Wasabi:      https://s3.<region>.wasabisys.com",
+        "# backup_s3_endpoint = https://s3.us-west-004.backblazeb2.com",
+        "# backup_s3_force_path_style = true"
+      ]
     }
   ].freeze
 
@@ -403,6 +455,10 @@ class Config
       get("google_api_key").present? && get("google_cse_id").present?
     when "local_images"
       get("images_path").present?
+    when "notes_backup"
+      get("backup_s3_bucket").present? &&
+        get("backup_s3_access_key_id").present? &&
+        get("backup_s3_secret_access_key").present?
     when "ai"
       ai_providers_available.any?
     else
